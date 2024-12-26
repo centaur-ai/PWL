@@ -19,14 +19,18 @@ unsigned int debug_counter = 0;
 
 unsigned int constant_offset = 0;
 bool enable_streaming = false;
-string uuid = "";
+std::string uuid = "";
 
-bool write_json_stream(const string& type, const string& axiom,
-                      const string& description, const string& rate) {
+std::string to_string(const core::memory_stream& stream) {
+    return std::string { stream.buffer, stream.position };
+}
+
+bool write_json_stream(const std::string& type, const std::string& axiom,
+                      const std::string& description, const std::string& rate) {
     if (!enable_streaming)
         return true;
 
-    string path = "/tmp/centaur/" + uuid + ".jsonl";
+    std::string path = "/tmp/centaur/" + uuid + ".jsonl";
     FILE* stream = fopen(path.c_str(), "a");
     if (stream == nullptr)
         return false;
@@ -309,15 +313,6 @@ int main(int argc, const char** argv) {
         print(*lf, stdout, printer);
         print("\n", stdout);
 
-        if (enable_streaming) {
-            stringstream axiom_str;
-            print(*lf, axiom_str, printer);
-            stringstream rate_str;
-            print(collector.current_log_probability, rate_str);
-            write_json_stream("axiom", axiom_str.str(),
-                            "Added logical form to theory", rate_str.str());
-        }
-
         print("Running some iterations of MCMC to optimize theory...\n", stdout);
         Theory& T_MAP = *((Theory*) alloca(sizeof(Theory)));
         PriorStateType& proof_axioms_MAP = *((PriorStateType*) alloca(sizeof(PriorStateType)));
@@ -326,6 +321,16 @@ int main(int argc, const char** argv) {
         PriorStateType::clone(proof_axioms, proof_axioms_MAP, formula_map);
         auto collector = make_log_probability_collector(T, proof_prior, new_proof);
         double max_log_probability = collector.current_log_probability;
+
+        if (enable_streaming) {
+            memory_stream axiom_str { 65536 };
+            print(*lf, axiom_str, printer);
+            memory_stream rate_str { 65536 };
+            print(collector.current_log_probability, rate_str);
+            write_json_stream("axiom", to_string(axiom_str),
+                            "Added logical form to theory", to_string(rate_str));
+        }
+
         for (unsigned int j = 0; j < 4; j++) {
             for (unsigned int t = 0; t < 500; t++) {
                 do_mh_step(T, proof_prior, proof_axioms, collector, collector.test_proof, (t < 40 ? 1.0 : 0.01));
@@ -352,12 +357,12 @@ int main(int argc, const char** argv) {
         print("Theory log probability: ", stdout); print(max_log_probability, stdout); print("\n\n", stdout);
 
         if (enable_streaming) {
-            stringstream axiom_str;
+            memory_stream axiom_str { 65536 };
             print(*lf, axiom_str, printer);
-            stringstream rate_str;
+            memory_stream rate_str { 65536 };
             print(max_log_probability, rate_str);
-            write_json_stream("axiom", axiom_str.str(),
-                            "Best theory after optimization", rate_str.str());
+            write_json_stream("axiom", to_string(axiom_str),
+                            "Best theory after optimization", to_string(rate_str));
         }
 
         free(T_MAP); free(proof_axioms_MAP);
@@ -415,10 +420,10 @@ int main(int argc, const char** argv) {
             fflush(stdout);
 
             if (enable_streaming) {
-                stringstream axiom_str;
+                memory_stream axiom_str { 65536 };
                 print(*lfs.last(), axiom_str, printer);
-                write_json_stream("query", axiom_str.str(),
-                                "Query result", to_string(probabilities[0]));
+                write_json_stream("query", to_string(axiom_str),
+                                "Query result", std::to_string(probabilities[0]));
             }
         } else {
             array_map<string, double> answers(8);
@@ -441,12 +446,12 @@ int main(int argc, const char** argv) {
             fflush(stdout);
 
             if (enable_streaming) {
-                stringstream axiom_str;
+                memory_stream axiom_str { 65536 };
                 print(*lfs.last(), axiom_str, printer);
-                stringstream answer_str;
+                memory_stream answer_str { 65536 };
                 print(answers.keys[0], answer_str);
-                write_json_stream("query", axiom_str.str(),
-                                answer_str.str(), to_string(answers.values[0]));
+                write_json_stream("query", to_string(axiom_str),
+                                to_string(answer_str), std::to_string(answers.values[0]));
             }
 
             for (auto entry : answers)
@@ -460,3 +465,4 @@ int main(int argc, const char** argv) {
             free(entry.key);
         return EXIT_SUCCESS;
     }
+
