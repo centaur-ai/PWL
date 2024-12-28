@@ -21,6 +21,31 @@ unsigned int constant_offset = 0;
 bool enable_streaming = false;
 std::string uuid = "";
 
+std::string escape_json_string(const std::string& input) {
+    std::string output;
+    output.reserve(input.length() + 20);
+    for (char c : input) {
+        switch (c) {
+            case '"': output += "\\\""; break;
+            case '\\': output += "\\\\"; break;
+            case '\b': output += "\\b"; break;
+            case '\f': output += "\\f"; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            default:
+                if ('\x00' <= c && c <= '\x1f') {
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    output += buf;
+                } else {
+                    output += c;
+                }
+        }
+    }
+    return output;
+}
+
 std::string to_string(const core::memory_stream& stream) {
     return std::string { stream.buffer, stream.position };
 }
@@ -40,13 +65,23 @@ bool write_json_stream(const std::string& type, const std::string& axiom,
     char timestamp[sizeof "2024-01-24T10:00:00Z"];
     strftime(timestamp, sizeof timestamp, "%FT%TZ", gmtime(&now));
 
+    // Escape the strings that might contain special characters
+    std::string escaped_axiom = escape_json_string(axiom);
+    std::string escaped_desc = escape_json_string(description);
+
     fprintf(stream, "{\"type\":\"%s\",\"axiom\":\"%s\",\"description\":\"%s\","
             "\"rate\":\"%s\",\"created_at\":\"%s\"}\n",
-            type.c_str(), axiom.c_str(), description.c_str(),
+            type.c_str(), escaped_axiom.c_str(), escaped_desc.c_str(),
             rate.c_str(), timestamp);
 
     fclose(stream);
     return true;
+}
+
+void write_stream_end() {
+    if (enable_streaming) {
+        write_json_stream("system", "", "stream_end", "0");
+    }
 }
 
 template<typename Stream>
@@ -161,9 +196,10 @@ int main(int argc, const char** argv) {
         fprintf(stdout, "Usage: pwl_reasoner <file with logical forms> [--id uuid]\n");
         exit(EXIT_FAILURE);
     }
-
+                                        
     if (enable_streaming) {
         mkdir("/tmp/centaur", 0777);
+        atexit(write_stream_end);  // Register the stream end function
     }
 
     hash_map<string, unsigned int> names(256);
@@ -465,4 +501,3 @@ int main(int argc, const char** argv) {
             free(entry.key);
         return EXIT_SUCCESS;
     }
-
