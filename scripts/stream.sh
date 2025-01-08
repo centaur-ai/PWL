@@ -1,2 +1,10 @@
 #!/bin/bash
-./pwl_reasoner_dbg "$1" | tee >(python stream.py > "${1%.*}.jsonl")
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <input_file> <id>"
+  exit 1
+fi
+
+input_file="$1"
+id="$2"
+
+./pwl_reasoner_dbg "$input_file" | tee >(python3 stream.py >> "/tmp/centaur/${id}.jsonl")
