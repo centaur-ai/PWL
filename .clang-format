@@ -1,0 +1,17 @@
+BasedOnStyle: LLVM
+UseTab: ForIndentation
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 0
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortFunctionsOnASingleLine: Empty
+AlignOperands: true
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 1
+PointerAlignment: Left
+ReferenceAlignment: Left
+SpaceAfterTemplateKeyword: false
+AlignAfterOpenBracket: Align
+BinPackArguments: false
+BinPackParameters: false

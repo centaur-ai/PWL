@@ -13,6 +13,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install clang-format
+        run: sudo apt-get install -y clang-format
+
+      - name: Run clang-format check
+        run: |
+          # Find files to format
+          FILES_TO_CHECK=$(find . -type f \( -name '*.cpp' -o -name '*.h' \))
+          
+          for FILE in $FILES_TO_CHECK; do
+            clang-format --dry-run --Werror -style=file $FILE
+          done
+
+      # Fail the workflow if formatting issues are found
+      - name: Check for formatting issues
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Formatting issues found. Please run clang-format locally."
+            exit 1
+          fi
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
