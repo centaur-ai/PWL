@@ -2587,7 +2587,7 @@ struct set_reasoning
 		}
 		stack[stack.length++] = set;
 
-		unsigned int* clique = NULL; unsigned int clique_count, ancestor_of_clique, upper_bound = 0;
+		unsigned int* clique = nullptr; unsigned int clique_count, ancestor_of_clique, upper_bound = 0;
 		if (is_fixed) {
 			upper_bound = sets[set].set_size;
 		} else if (!get_size_upper_bound(set, upper_bound, clique, clique_count, ancestor_of_clique)) {
@@ -2620,7 +2620,7 @@ struct set_reasoning
 			}
 		}
 
-		if (!is_fixed) {
+		if (!is_fixed && clique != nullptr) {
 			bool child_graph_changed = false;
 			unsigned int clique_upper_bound = sets[ancestor_of_clique].set_size;
 			for (unsigned int i = 0; i < clique_count; i++)
@@ -3814,6 +3814,37 @@ struct set_reasoning
 				fprintf(stderr, "set_reasoning.check_set_ids WARNING: `set_ids` map contains an entry from formula '");
 				print(entry.key, stderr); fprintf(stderr, "' to %u, but the set with ID %u has set formula '", entry.value, entry.value);
 				print(*sets[entry.value].set_formula(), stderr); fprintf(stderr, "'.\n");
+				success = false;
+			}
+		}
+		return success;
+	}
+
+	bool check_symbols_in_formulas() const {
+		hash_multiset<unsigned int> computed_symbols_in_formulas(256);
+		for (unsigned int i = 1; i < set_count + 1; i++) {
+			if (sets[i].size_axioms.data == nullptr) continue;
+
+			array_multiset<unsigned int> symbols(16);
+			Formula* formula = sets[i].set_formula();
+			if (!get_constants(*formula, symbols)) return false;
+			computed_symbols_in_formulas.add<true>(symbols);
+		}
+
+		bool success = true;
+		for (const auto& entry : computed_symbols_in_formulas.counts) {
+			bool contains;
+			unsigned int count = symbols_in_formulas.counts.get(entry.key, contains);
+			if (!contains) count = 0;
+			if (entry.value != count) {
+				fprintf(stderr, "set_reasoning.check_symbols_in_formulas WARNING: `symbols_in_formulas` for symbol `%u` has count %u, but only %u symbols appear in set formulas.\n", entry.key, count, entry.value);
+				success = false;
+			}
+		} for (const auto& entry : symbols_in_formulas.counts) {
+			if (computed_symbols_in_formulas.counts.table.contains(entry.key))
+				continue;
+			if (entry.value != 0) {
+				fprintf(stderr, "set_reasoning.check_symbols_in_formulas WARNING: `symbols_in_formulas` for symbol `%u` has count %u, but only 0 symbols appear in set formulas.\n", entry.key, entry.value);
 				success = false;
 			}
 		}
